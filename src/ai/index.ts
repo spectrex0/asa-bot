@@ -3,7 +3,7 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { systemPrompt } from './settings';
 import type { Message, Guild } from 'discord.js';
-import { fetch as httpFetch, Response as UndiciResponse } from 'undici';
+import { fetch as httpFetch } from 'undici';
 
 interface ScamRule {
   pattern: string;
