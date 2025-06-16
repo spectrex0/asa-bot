@@ -48,7 +48,9 @@ export async function isScam(message: string): Promise<boolean> {
 
   if (!res.ok) throw new Error(`Gemini API error: ${res.status} ${res.statusText}`);
 
-  const data = await res.json();
+  const text = await res.text();  // no lanza por segunda lectura
+const data = JSON.parse(text);  // seguro
+
   const reply: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? 'NO';
   return reply.trim().toUpperCase() === 'YES';
 }
