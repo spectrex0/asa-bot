@@ -10,6 +10,16 @@ interface ScamRule {
   content: string;
 }
 
+interface GeminiResponse {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+}
+
 const SCAM_RULES_PATH = join(__dirname, 'scamPatterns.json');
 const GEMINI_MODEL = 'gemini-2.0-flash';
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
@@ -44,7 +54,6 @@ export async function isScam(message: string): Promise<boolean> {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
   });
 
-  let text: string;
   try {
     const res = await httpFetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
       method: 'POST',
@@ -57,22 +66,13 @@ export async function isScam(message: string): Promise<boolean> {
       return false;
     }
 
-    text = await res.text();
+    const data = (await res.json()) as GeminiResponse;
+    const reply: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? 'NO';
+    return reply.trim().toUpperCase() === 'YES';
   } catch (err) {
-    console.error('[isScam] Network or parse error:', err);
+    console.error('[isScam] Request failed:', err);
     return false;
   }
-
-  let data: any;
-  try {
-    data = JSON.parse(text);
-  } catch (err) {
-    console.error('[isScam] Failed to parse Gemini response:', err);
-    return false;
-  }
-
-  const reply: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? 'NO';
-  return reply.trim().toUpperCase() === 'YES';
 }
 
 export default function aiBrain(): void {
@@ -83,7 +83,7 @@ export default function aiBrain(): void {
     const author = message.author;
     const guild = message.guild;
 
-    console.log(`[msg] ${author.tag}: "${content}"`);
+    console.log(`[msg] ${author.tag}: "${content}"]`);
 
     if (content.toLowerCase() === 'asa who are u?') {
       await message.reply("I'm top 2 scammers hater.");
