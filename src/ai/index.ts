@@ -1,10 +1,20 @@
-import asa from '..';
+
+import {ActivityType, Client, GatewayIntentBits} from 'discord.js'
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { systemPrompt } from './settings';
 import type { Message, Guild } from 'discord.js';
 import { fetch as httpFetch } from 'undici';
-
+export const asa = new Client({
+    intents: [
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMessageTyping
+        
+    ]
+})
 interface ScamRule {
   pattern: string;
   content: string;
@@ -33,9 +43,9 @@ const messageTimestamps = new Map<string, number[]>();
   try {
     const raw = await readFile(SCAM_RULES_PATH, 'utf-8');
     scamRules = JSON.parse(raw) as ScamRule[];
-    console.log(`[init] Loaded ${scamRules.length} scam patterns`);
+    console.log(`[INIT] Loaded ${scamRules.length} scam patterns`);
   } catch (err) {
-    console.error('[init] Failed to load scamPatterns.json', err);
+    console.error('[INIT] Failed to load scamPatterns.json', err);
   }
 })();
 
@@ -74,7 +84,7 @@ export async function isScam(message: string): Promise<boolean> {
   }
 }
 
-export default function aiBrain(): void {
+export default function aiBrain() {
   asa.on('messageCreate', async (message: Message) => {
     if (message.author.bot) return;
 
@@ -106,12 +116,11 @@ export default function aiBrain(): void {
 
     const OWNER_ID = process.env.AUTHOR;
     if (!OWNER_ID) {
-      console.warn('[warn] AUTHOR env var missing – cannot notify');
+      console.warn('[WARNING] AUTHOR env var missing – cannot notify');
       return;
     }
 
     try {
-      // Check local scam patterns
       let localFlag = false;
       let matchedPattern = '';
       for (const r of scamRules) {
@@ -123,7 +132,6 @@ export default function aiBrain(): void {
         }
       }
 
-      // Heuristic + remote AI check
       const suspectTokens = /(http|www\.|\.com|telegram|\$\d|\+\d{5})/i;
       const remoteFlag = !localFlag && suspectTokens.test(content)
         ? await isScam(content)

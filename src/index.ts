@@ -2,6 +2,7 @@ import { log } from 'console'
 import {ActivityType, Client, GatewayIntentBits} from 'discord.js'
 import dotenv from 'dotenv' 
 import aiBrain from './ai/index'
+import node from "@elysiajs/node";
 import Elysia from "elysia";
  
 dotenv.config()
@@ -15,9 +16,12 @@ When someone talks to you directly:
 - Respond like yourself, not just with YES/NO.
 - Keep it short, witty, and in English or Spanish if needed.
 - Don't mention being an AI or Gemini unless asked.
+- U are human
+- when u reply u dont need to do it as a robot, u can reply like human
 
 Example replies:
 "Asa here. Who’s asking?"
+"Yes?"
 "Scammer radar: all clear."
 "I jail people for a living. What do you do?"
 
@@ -25,7 +29,7 @@ ur owner and creator is Tokyo, he was bored one day at 2 am and he created u
 Now respond to this user:
 `;
 
-const asa = new Client({
+export const asa = new Client({
     intents: [
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessages,
@@ -39,7 +43,7 @@ const asa = new Client({
   asa.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
-  const prefix = '!ask';
+  const prefix = 'asa';
   if (!message.content.startsWith(prefix)) return;
 
   const prompt = message.content.slice(prefix.length).trim() + systemPrompt;
@@ -47,7 +51,7 @@ const asa = new Client({
 
   if (!apiKey) {
     console.error('GEMINI_API_KEY missing');
-    await message.reply('Error: Falta la clave de API de Gemini.');
+    await message.reply('[ERROR] PLEASE PROVIDE GEMINI API KEY');
     return;
   }
 
@@ -64,17 +68,17 @@ const asa = new Client({
 
     if (!res.ok) {
       const errorText = await res.text();
-      console.error(`Gemini error: ${res.status} ${errorText}`);
-      await message.reply('Error al generar la respuesta con Gemini.');
+      console.error(`[GEMINI API ERROR] ${res.status} ${errorText}`);
+      await message.reply('[ERROR] Error  generating response');
       return;
     }
 
     const data = await res.json();
     const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    await message.reply(responseText || 'No se pudo generar una respuesta.');
+    await message.reply(responseText || 'I cant generate a reply for that :/');
   } catch (error) {
-    console.error('Error al llamar a Gemini:', error);
+    console.error('[ERROR]', error);
     await message.reply('Ocurrió un error al procesar tu solicitud.');
   }
 
@@ -93,7 +97,7 @@ const asa = new Client({
 async function startBot() {
   await aiBrain()
   await ask()
-
+  
   asa.once('ready', () => {
     const guildCount = asa.guilds.cache.size;
 
@@ -103,24 +107,15 @@ async function startBot() {
       type: ActivityType.Watching
     });
 
-    log('[ASA BOT ONLINE]: Logged in as', asa.user?.username);
+    log('[ONLINE] Logged in as', asa.user?.username);
   });
 
   asa.login(process.env.TOKEN);
 }
 
-import { createServer } from 'node:http';
-
-const app = new Elysia();
-
-app.get('/', () => 'Backend online — Fake Server for Asa');
-
-const server = createServer(app.handle as any);
-
-server.listen(2222, async () => {
-  log('[BACKEND SERVER RUNNING]: http://localhost:2222');
-  await startBot();          
-});
-
-
+const server = new Elysia({adapter: node()})
+server.listen(3000)
+.get('/', () => "FAKE SERVER BTW")
+log('[RUNNING] localhost port 3000')
+startBot()
 export default asa
