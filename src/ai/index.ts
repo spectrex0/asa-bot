@@ -3,6 +3,7 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { systemPrompt } from './settings';
 import type { Message, Guild } from 'discord.js';
+import { fetch as httpFetch, Response as UndiciResponse } from 'undici';
 
 interface ScamRule {
   pattern: string;
@@ -32,7 +33,10 @@ const messageTimestamps = new Map<string, number[]>();
 
 export async function isScam(message: string): Promise<boolean> {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY env var missing');
+  if (!apiKey) {
+    console.error('[isScam] GEMINI_API_KEY env var missing');
+    return false;
+  }
 
   const prompt = systemPrompt + message;
 
@@ -40,18 +44,33 @@ export async function isScam(message: string): Promise<boolean> {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
   });
 
-  const res = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body,
-  });
+  let res: UndiciResponse;
+  try {
+    res = await httpFetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+  } catch (err) {
+    console.error('[isScam] Network error contacting Gemini:', err);
+    return false;
+  }
 
-  if (!res.ok) throw new Error(`Gemini API error: ${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    console.error(`[isScam] Gemini API error: ${res.status} ${res.statusText}`);
+    return false;
+  }
 
-  const text = await res.text();  // no lanza por segunda lectura
-const data = JSON.parse(text);  // seguro
+  let data: any;
+  try {
+    const text = await res.text();
+    data = JSON.parse(text);
+  } catch (err) {
+    console.error('[isScam] Failed to parse Gemini response:', err);
+    return false;
+  }
 
-  const reply: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? 'NO';
+  const reply: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? 'NO';
   return reply.trim().toUpperCase() === 'YES';
 }
 
@@ -70,7 +89,7 @@ export default function aiBrain(): void {
       return;
     }
 
-    // Control básico anti spam
+    // Anti-spam
     const now = Date.now();
     const list = messageTimestamps.get(author.id) || [];
     const recent = list.filter((t) => now - t < SPAM_INTERVAL);
@@ -92,6 +111,7 @@ export default function aiBrain(): void {
     }
 
     try {
+      // Local rules
       let localFlag = false;
       let matchedPattern = '';
       for (const r of scamRules) {
@@ -103,8 +123,11 @@ export default function aiBrain(): void {
         }
       }
 
-      const suspectTokens = /(|http|www\.|\.com|telegram|\$\d|\+\d{5})/i;
-      const remoteFlag = !localFlag && suspectTokens.test(content) ? await isScam(content) : false;
+      // Heuristic for remote check
+      const suspectTokens = /(http|www\.|\.com|telegram|\$\d|\+\d{5})/i;
+      const remoteFlag = !localFlag && suspectTokens.test(content)
+        ? await isScam(content)
+        : false;
 
       const flagged = localFlag || remoteFlag;
       if (!flagged) return;
@@ -112,16 +135,16 @@ export default function aiBrain(): void {
       console.log(`[SCAM] ${author.tag} – rule: ${matchedPattern || (remoteFlag ? 'Gemini' : 'n/a')}`);
       await message.react('⚠️');
 
-      await message.reply(`<@${OWNER_ID}>, suspicious message. \nCan I jail him? :>`);
+      await message.reply(`<@${OWNER_ID}>, suspicious message.\nCan I jail him? :>`);
 
       if (!('createMessageCollector' in message.channel)) return;
 
       const filter = (m: Message) =>
         m.author.id === OWNER_ID && ['yes', 'no'].includes(m.content.toLowerCase());
 
-      const collector = message.channel.createMessageCollector({ filter, time: 300_000 });
+      const collector = (message.channel as any).createMessageCollector({ filter, time: 300_000 });
 
-      collector.on('collect', async (m) => {
+      collector.on('collect', async (m: Message) => {
         if (guild && m.content.toLowerCase() === 'yes') {
           await jailUser(guild, author.id);
           await m.reply(':>');
@@ -131,7 +154,7 @@ export default function aiBrain(): void {
         collector.stop();
       });
 
-      collector.on('end', async (_, reason) => {
+      collector.on('end', async (_: any, reason: string) => {
         if (reason === 'time' && guild) {
           await jailUser(guild, author.id);
           await message.reply(`⏰ Time's up (Tokyo didn't reply in 5 mins) — ${author.tag} jailed for safety.`);
