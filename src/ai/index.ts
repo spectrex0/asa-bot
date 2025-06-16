@@ -44,26 +44,27 @@ export async function isScam(message: string): Promise<boolean> {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
   });
 
-  let res: UndiciResponse;
+  let text: string;
   try {
-    res = await httpFetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
+    const res = await httpFetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
     });
-  } catch (err) {
-    console.error('[isScam] Network error contacting Gemini:', err);
-    return false;
-  }
 
-  if (!res.ok) {
-    console.error(`[isScam] Gemini API error: ${res.status} ${res.statusText}`);
+    if (!res.ok) {
+      console.error(`[isScam] Gemini API error: ${res.status} ${res.statusText}`);
+      return false;
+    }
+
+    text = await res.text();
+  } catch (err) {
+    console.error('[isScam] Network or parse error:', err);
     return false;
   }
 
   let data: any;
   try {
-    const text = await res.text();
     data = JSON.parse(text);
   } catch (err) {
     console.error('[isScam] Failed to parse Gemini response:', err);
