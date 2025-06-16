@@ -11,13 +11,11 @@ interface ScamRule {
 }
 
 interface GeminiResponse {
-  candidates?: Array<{
+  candidates?: {
     content?: {
-      parts?: Array<{
-        text?: string;
-      }>;
+      parts?: { text?: string }[];
     };
-  }>;
+  }[];
 }
 
 const SCAM_RULES_PATH = join(__dirname, 'scamPatterns.json');
@@ -67,7 +65,8 @@ export async function isScam(message: string): Promise<boolean> {
     }
 
     const data = (await res.json()) as GeminiResponse;
-    const reply: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? 'NO';
+    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? 'NO';
+
     return reply.trim().toUpperCase() === 'YES';
   } catch (err) {
     console.error('[isScam] Request failed:', err);
@@ -83,14 +82,14 @@ export default function aiBrain(): void {
     const author = message.author;
     const guild = message.guild;
 
-    console.log(`[msg] ${author.tag}: "${content}"]`);
+    console.log(`[msg] ${author.tag}: "${content}"`);
 
     if (content.toLowerCase() === 'asa who are u?') {
       await message.reply("I'm top 2 scammers hater.");
       return;
     }
 
-    // Anti-spam
+    // Anti-spam control
     const now = Date.now();
     const list = messageTimestamps.get(author.id) || [];
     const recent = list.filter((t) => now - t < SPAM_INTERVAL);
@@ -112,7 +111,7 @@ export default function aiBrain(): void {
     }
 
     try {
-      // Local rules
+      // Check local scam patterns
       let localFlag = false;
       let matchedPattern = '';
       for (const r of scamRules) {
@@ -124,7 +123,7 @@ export default function aiBrain(): void {
         }
       }
 
-      // Heuristic for remote check
+      // Heuristic + remote AI check
       const suspectTokens = /(http|www\.|\.com|telegram|\$\d|\+\d{5})/i;
       const remoteFlag = !localFlag && suspectTokens.test(content)
         ? await isScam(content)
