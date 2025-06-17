@@ -161,7 +161,7 @@ function aiBrain() {
         if (content.length < MIN_SCAM_LENGTH)
             return;
         const guildId = guild.id;
-        const currentOwner = serverOwners.get(guildId) || OWNER_ID;
+        const currentOwner = serverOwners.get(guildId);
         if (!currentOwner) {
             console.warn(`[WARNING] No owner set for guild: ${guildId}`);
             return;
