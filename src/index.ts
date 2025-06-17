@@ -3,12 +3,25 @@ import {ActivityType, Client, GatewayIntentBits} from 'discord.js'
 import dotenv from 'dotenv' 
 import node from "@elysiajs/node";
 import Elysia from "elysia";
- 
+  
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import type { Message, Guild } from 'discord.js';
 import { fetch as httpFetch } from 'undici';
 dotenv.config()
+// Inicializa variables de entorno
+dotenv.config();
+
+// Cliente de Discord
+export const asa = new Client({
+  intents: [
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMessageTyping,
+  ],
+});
 
 export const systemPrompt = `
 You are an AI trained to detect scam, spam, or suspicious messages in Discord.
@@ -66,17 +79,18 @@ VoIP: Twilio  ☎, Asterisk PBX 🌟, Freeswitch 🔁, SIP 📡,
 
 
 `;
+// Configuración inicial
+const SCAM_RULES_PATH = join(__dirname, 'scamPatterns.json');
+const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`; 
+const MIN_SCAM_LENGTH = 15;
+const SPAM_LIMIT = 5;
+const SPAM_INTERVAL = 10_000;
 
-export const asa = new Client({
-    intents: [
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMessageTyping
-        
-    ]
-})
+let scamRules: ScamRule[] = [];
+const messageTimestamps = new Map<string, number[]>();
+const serverOwners = new Map<string, string>(); // Dueños por servidor
+
 interface ScamRule {
   pattern: string;
   content: string;
@@ -90,17 +104,7 @@ interface GeminiResponse {
   }[];
 }
 
-const SCAM_RULES_PATH = join(__dirname, 'scamPatterns.json');
-const GEMINI_MODEL = 'gemini-2.0-flash';
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
-
-const MIN_SCAM_LENGTH = 15;
-const SPAM_LIMIT = 5;
-const SPAM_INTERVAL = 10_000;
-
-let scamRules: ScamRule[] = [];
-const messageTimestamps = new Map<string, number[]>();
-
+// Cargar reglas de estafa
 (async function loadScamRules() {
   try {
     const raw = await readFile(SCAM_RULES_PATH, 'utf-8');
@@ -111,6 +115,7 @@ const messageTimestamps = new Map<string, number[]>();
   }
 })();
 
+// Verifica si un mensaje es sospechoso
 export async function isScam(message: string): Promise<boolean> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -119,7 +124,6 @@ export async function isScam(message: string): Promise<boolean> {
   }
 
   const prompt = systemPrompt + message;
-
   const body = JSON.stringify({
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
   });
@@ -138,7 +142,6 @@ export async function isScam(message: string): Promise<boolean> {
 
     const data = (await res.json()) as GeminiResponse;
     const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? 'NO';
-
     return reply.trim().toUpperCase() === 'YES';
   } catch (err) {
     console.error('[isScam] Request failed:', err);
@@ -146,18 +149,14 @@ export async function isScam(message: string): Promise<boolean> {
   }
 }
 
+// Sistema de detección de spam/estafas
 function aiBrain() {
   asa.on('messageCreate', async (message: Message) => {
-    console.log(message)
-  })
-  asa.on('messageCreate', async (message: Message) => {
-    if (message.author.bot) return;
+    if (message.author.bot || !message.guild) return;
 
     const content = message.content.trim();
     const author = message.author;
     const guild = message.guild;
-
-    console.log(`[msg] ${author.tag}: "${content}"`);
 
     if (content.toLowerCase() === 'asa who are u?') {
       await message.reply("I'm top 2 scammers hater.");
@@ -178,9 +177,11 @@ function aiBrain() {
 
     if (content.length < MIN_SCAM_LENGTH) return;
 
-    const OWNER_ID = process.env.AUTHOR;
+    const guildId = guild.id;
+    const OWNER_ID = serverOwners.get(guildId) || process.env.AUTHOR;
+
     if (!OWNER_ID) {
-      console.warn('[WARNING] AUTHOR env var missing – cannot notify');
+      console.warn(`[WARNING] No owner set for guild: ${guildId}`);
       return;
     }
 
@@ -196,17 +197,13 @@ function aiBrain() {
         }
       }
 
-      const suspectTokens = /(?:https?:|www\.|\.(?:com|net|org)|t\.me|telegram|whatsapp|join.*chat|earn money|free gift|click here|\$\d+|\+\d{5,}|looking for opportunities|open to collaborate|reach out)/i;
-const remoteFlag = !localFlag && content.length >= MIN_SCAM_LENGTH
-  ? await isScam(content)
-  : false;
-
+      const remoteFlag = !localFlag && content.length >= MIN_SCAM_LENGTH ? await isScam(content) : false;
       const flagged = localFlag || remoteFlag;
+
       if (!flagged) return;
 
       console.log(`[SCAM] ${author.tag} – rule: ${matchedPattern || (remoteFlag ? 'Gemini' : 'n/a')}`);
       await message.react('⚠️');
-
       await message.reply(`<@${OWNER_ID}>, suspicious message.\nCan I jail him? :>`);
 
       if (!('createMessageCollector' in message.channel)) return;
@@ -229,7 +226,9 @@ const remoteFlag = !localFlag && content.length >= MIN_SCAM_LENGTH
       collector.on('end', async (_: any, reason: string) => {
         if (reason === 'time' && guild) {
           await jailUser(guild, author.id);
-          await message.reply(`⏰ Time's up (Tokyo didn't reply in 5 mins) — ${author.tag} jailed for safety.`);
+          await message.reply(
+            `⏰ Time's up – ${author.tag} jailed for safety.`
+          );
         }
       });
     } catch (err) {
@@ -238,6 +237,7 @@ const remoteFlag = !localFlag && content.length >= MIN_SCAM_LENGTH
   });
 }
 
+// Mandar a la cárcel
 async function jailUser(guild: Guild, userId: string): Promise<void> {
   const roleName = 'Jail';
   let jailRole = guild.roles.cache.find((r) => r.name === roleName);
@@ -248,89 +248,89 @@ async function jailUser(guild: Guild, userId: string): Promise<void> {
   await member.roles.set([jailRole]);
 }
 
- function ask(): void {
-  asa.on('messageCreate', async (message) => {
+// Comandos de texto
+asa.on('messageCreate', async (message: Message) => {
   if (message.author.bot) return;
+  if (!message.content.startsWith('!')) return;
 
-  const prefix = '!ask';
-  if (!message.content.startsWith(prefix)) return;
+  const args = message.content.slice(1).trim().split(/ +/);
+  const command = args.shift()?.toLowerCase();
+  const guild = message.guild;
 
-  const prompt = message.content.slice(prefix.length).trim() + systemPrompt;
-  const apiKey = process.env.GEMINI_API_KEY;
-
-  if (!apiKey) {
-    console.error('GEMINI_API_KEY missing');
-    await message.reply('[ERROR] PLEASE PROVIDE GEMINI API KEY');
-    return;
+  if (!guild) {
+    return message.reply('[ERROR]');
   }
 
-  try {
-    const body = JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    });
+  const guildId = guild.id;
+  const currentOwner = serverOwners.get(guildId) || process.env.AUTHOR;
 
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-    });
+  if (command === 'setowner') {
+    const userMention = args[0];
+    const userId = userMention.replace(/\D/g, '');
 
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error(`[GEMINI API ERROR] ${res.status} ${errorText}`);
-      await message.reply('[ERROR] Error  generating response');
-      return;
+    if (!userId) {
+      return message.reply('❌ [ERROR 404] PLASE MENTION THE NEW OWNER');
     }
 
-    const data = await res.json();
-    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    await message.reply(responseText || 'I cant generate a reply for that :/');
-  } catch (error) {
-    console.error('[ERROR]', error);
-    await message.reply('Ocurrió un error al procesar tu solicitud.');
+    serverOwners.set(guildId, userId);
+    return message.reply(`✅ <@${userId}>`);
   }
 
-  return;
+  if (currentOwner !== process.env.AUTHOR) {
+    return message.reply('❌ [ERROR] U DONT HAVE PERMISSIONS TO RUN THIS COMMAND');
+  }
+
+  if (command === 'guilds') {
+    const guilds = asa.guilds.cache.map(g => `- ${g.name} (ID: ${g.id})`).join('\n');
+    return message.reply(`[SERVERS]: ${asa.guilds.cache.size} \n${guilds}`);
+  }
+
+  if (command === 'leave') {
+    const guildIdToLeave = args[0];
+    const guildToLeave = asa.guilds.cache.get(guildIdToLeave);
+    if (!guildToLeave) {
+      return message.reply('❌ [ERROR] INVALID ID');
+    }
+
+    await guildToLeave.leave();
+    return message.reply(`✅ ${guildToLeave.name}`);
+  }
+
+  if (command === 'invite') {
+    const guildId = args[0];
+    if (!guildId) {
+      return message.reply('❌ [PLEASE PROVIDE A ID]');
+    }
+
+    const clientId = asa.user?.id;
+    if (!clientId) return message.reply('[INTERNAL ERROR PLEASE CONTACT THE BOT DEVELOPER]');
+
+    const inviteLink = `https://discord.com/oauth2/authorize?client_id=${clientId}&permissions=8&scope=bot&guild_id=${guildId}`;
+    await message.author.send(`🔗 Enlace para invitarme al servidor \`${guildId}\`:\n${inviteLink}`);
+    await message.reply('✅ Revisa tus mensajes privados.');
+  }
 });
 
-}
+// Webserver básico
+const server = new Elysia({ adapter: node() }).listen(3000);
+server.get('/api', () => 'FAKE SERVER BTW');
+log('[RUNNING] localhost port 3000');
 
- asa.on('messageCreate', (message) => {
-    if(message.content === "test"){
-        message.reply("working")
-        console.log("[TEST PASSED]")
-    }
-})
-
+// Iniciar bot
 async function startBot() {
-    aiBrain()
-    ask()
-  
+  aiBrain();
+
   asa.once('ready', () => {
     const guildCount = asa.guilds.cache.size;
-
     asa.user?.setStatus('dnd');
     asa.user?.setActivity({
       name: ` ${guildCount} server`,
-      type: ActivityType.Watching
+      type: ActivityType.Watching,
     });
-
     log('[ONLINE] Logged in as', asa.user?.username);
   });
 
-  asa.login(process.env.TOKEN);
+  await asa.login(process.env.TOKEN);
 }
 
-const server = new Elysia({adapter: node()})
-server.listen(3000)
-server.get('/api', () => "FAKE SERVER BTW")
-log('[RUNNING] localhost port 3000')
-server.post('/', ({body}) => {
-  const {} = body;
-  return{
-    message: "Working ?"
-  }
-})
-startBot() // <- this shit is to run the bot 
-export default asa
+startBot();
