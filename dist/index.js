@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.asa = exports.systemPrompt = void 0;
+exports.systemPrompt = exports.asa = void 0;
 exports.isScam = isScam;
 const console_1 = require("console");
 const discord_js_1 = require("discord.js");
@@ -13,72 +13,82 @@ const elysia_1 = __importDefault(require("elysia"));
 const promises_1 = require("fs/promises");
 const path_1 = require("path");
 const undici_1 = require("undici");
+// Cargar variables de entorno
 dotenv_1.default.config();
-exports.systemPrompt = `
-You are an AI trained to detect scam, spam, or suspicious messages in Discord.
-Analyze the message content and respond only with "YES" if it's suspicious, or "NO" if it's safe.
-
-Suspicious behavior includes:
-- Spamming job offers, services, or ads repeatedly.
-- Messages that look like phishing or fake giveaways.
-- Unsolicited contact asking for personal info or money.
-- Promoting suspicious links or services.
-- Recruiting users for scams or fake projects.
-
-If unsure, default to "NO".
-
-Analyzing message:
-messages like that should be considered as scam
-
-👋 Hello there!
-I’m a passionate Full Stack Web & AI Developer 🚀
-Bringing digital ideas to life with code, creativity, and cutting-edge tech 💡💻
-
----------- 🛠️ My Skills Include : ----------
-
-🌐 Web Technologies
- 
-Frontend: React ⚛️, Angular.js 📐, Vue.js 🍃, Next.js ⏭️, Electron ⚡,
-Backend: Node.js 🌳, Express.js 🚂, Python 🐍, Django 🎯, Spring Boot ☕, .NET & C# 🔧,
-Databases: MySQL 🐬, MongoDB 🍃, PostgreSQL 🐘, Firebase 🔥, Supabase 🛡️, SQL 📊,
-No-Code/Low-Code: Bubble.io 🫧, WordPress 📝, Shopify 🛒, Webflow 🌊,
-
-📱 Mobile Technologies
-Cross-Platform: React Native 📲, Flutter 🐦,Ionic ⚛️
-Native: Swift 🍎, Kotlin 🤖, Java ☕
-Backend Integration: Firebase 🔥, Supabase 🛡️, REST & GraphQL APIs 🔗
-Mobile Payments & Auth: Stripe 💳, Google/Apple Sign-In 🔐
-Push & Deep Linking: OneSignal 🔔, Branch.io 🌿
-
-🤖 AI Technologies
- 
-LLM Models: Claude.ai 🧠, ChatGPT 4o 💬, GPT-4o-mini ⚙️,
-Chatbots: Botpress 🗣️, Dialogflow 💡, Google Assistant 🎙️,
-AI Voice Agents: Retell.ai 🔊, VAPI 🎧, Dasha 🗨️, Synthflow 🎶,
-Automation: Make.com 🔄, n8n 🕸️, Zapier ⚡,
-
- ☎ Other Technologies
- 
-VoIP: Twilio  ☎, Asterisk PBX 🌟, Freeswitch 🔁, SIP 📡,
-
---------------------------------------------------------------------------------------------
-
-💼 I’m actively looking for new opportunities!
-📬 Feel free to reach out anytime—I'm always open to connect, collaborate, or contribute.
-✨ Let’s build something amazing together!
-
-
-
-`;
+// Inicializar cliente de Discord
 exports.asa = new discord_js_1.Client({
     intents: [
         discord_js_1.GatewayIntentBits.GuildMembers,
         discord_js_1.GatewayIntentBits.GuildMessages,
         discord_js_1.GatewayIntentBits.Guilds,
         discord_js_1.GatewayIntentBits.MessageContent,
-        discord_js_1.GatewayIntentBits.GuildMessageTyping
-    ]
+        discord_js_1.GatewayIntentBits.GuildMessageTyping,
+    ],
 });
+// Ruta del archivo donde se guardan los dueños por servidor
+const OWNERS_FILE = (0, path_1.join)(__dirname, 'owners.json');
+// Map local para almacenar los dueños por servidor
+let serverOwners = new Map();
+// Tu ID (único usuario autorizado a usar los comandos)
+const OWNER_ID = process.env.AUTHOR || '852949329320345620'; // Reemplaza con tu ID real
+// Cargar dueños desde owners.json
+async function loadOwners() {
+    try {
+        const data = await (0, promises_1.readFile)(OWNERS_FILE, 'utf-8');
+        const parsed = JSON.parse(data);
+        serverOwners = new Map(Object.entries(parsed));
+    }
+    catch (err) {
+        console.warn('[INFO] No se encontró owners.json. Creando uno nuevo.');
+        await saveOwners();
+    }
+}
+// Guardar dueños en owners.json
+async function saveOwners() {
+    const obj = Object.fromEntries(serverOwners);
+    await (0, promises_1.writeFile)(OWNERS_FILE, JSON.stringify(obj, null, 2), 'utf-8');
+}
+// Prompt de IA
+exports.systemPrompt = `
+You are an AI trained to detect scam, spam, or suspicious messages in Discord.
+Analyze the message content and respond only with "YES" if it's suspicious, or "NO" if it's safe.
+Suspicious behavior includes:
+- Spamming job offers, services, or ads repeatedly.
+- Messages that look like phishing or fake giveaways.
+- Unsolicited contact asking for personal info or money.
+- Promoting suspicious links or services.
+- Recruiting users for scams or fake projects.
+If unsure, default to "NO".
+Analyzing message:
+messages like that should be considered as scam
+👋 Hello there!
+I’m a passionate Full Stack Web & AI Developer 🚀
+Bringing digital ideas to life with code, creativity, and cutting-edge tech 💡💻
+---------- 🛠️ My Skills Include : ----------
+🌐 Web Technologies
+Frontend: React ⚛️, Angular.js 📐, Vue.js 🍃, Next.js ⏭️, Electron ⚡,
+Backend: Node.js 🌳, Express.js 🚂, Python 🐍, Django 🎯, Spring Boot ☕, .NET & C# 🔧,
+Databases: MySQL 🐬, MongoDB 🍃, PostgreSQL 🐘, Firebase 🔥, Supabase 🛡️, SQL 📊,
+No-Code/Low-Code: Bubble.io 🫧, WordPress 📝, Shopify 🛒, Webflow 🌊,
+📱 Mobile Technologies
+Cross-Platform: React Native 📲, Flutter 🐦,Ionic ⚛️
+Native: Swift 🍎, Kotlin 🤖, Java ☕
+Backend Integration: Firebase 🔥, Supabase 🛡️, REST & GraphQL APIs 🔗
+Mobile Payments & Auth: Stripe 💳, Google/Apple Sign-In 🔐
+Push & Deep Linking: OneSignal 🔔, Branch.io 🌿
+🤖 AI Technologies
+LLM Models: Claude.ai 🧠, ChatGPT 4o 💬, GPT-4o-mini ⚙️,
+Chatbots: Botpress 🗣️, Dialogflow 💡, Google Assistant 🎙️,
+AI Voice Agents: Retell.ai 🔊, VAPI 🎧, Dasha 🗨️, Synthflow 🎶,
+Automation: Make.com 🔄, n8n 🕸️, Zapier ⚡,
+ ☎ Other Technologies
+VoIP: Twilio  ☎, Asterisk PBX 🌟, Freeswitch 🔁, SIP 📡,
+--------------------------------------------------------------------------------------------
+💼 I’m actively looking for new opportunities!
+📬 Feel free to reach out anytime—I'm always open to connect, collaborate, or contribute.
+✨ Let’s build something amazing together!
+`;
+// Configuración inicial
 const SCAM_RULES_PATH = (0, path_1.join)(__dirname, 'scamPatterns.json');
 const GEMINI_MODEL = 'gemini-2.0-flash';
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
@@ -128,15 +138,11 @@ async function isScam(message) {
 }
 function aiBrain() {
     exports.asa.on('messageCreate', async (message) => {
-        console.log(message);
-    });
-    exports.asa.on('messageCreate', async (message) => {
-        if (message.author.bot)
+        if (message.author.bot || !message.guild)
             return;
         const content = message.content.trim();
         const author = message.author;
         const guild = message.guild;
-        console.log(`[msg] ${author.tag}: "${content}"`);
         if (content.toLowerCase() === 'asa who are u?') {
             await message.reply("I'm top 2 scammers hater.");
             return;
@@ -154,9 +160,10 @@ function aiBrain() {
         }
         if (content.length < MIN_SCAM_LENGTH)
             return;
-        const OWNER_ID = process.env.AUTHOR;
-        if (!OWNER_ID) {
-            console.warn('[WARNING] AUTHOR env var missing – cannot notify');
+        const guildId = guild.id;
+        const currentOwner = serverOwners.get(guildId) || OWNER_ID;
+        if (!currentOwner) {
+            console.warn(`[WARNING] No owner set for guild: ${guildId}`);
             return;
         }
         try {
@@ -170,19 +177,16 @@ function aiBrain() {
                     break;
                 }
             }
-            const suspectTokens = /(?:https?:|www\.|\.(?:com|net|org)|t\.me|telegram|whatsapp|join.*chat|earn money|free gift|click here|\$\d+|\+\d{5,}|looking for opportunities|open to collaborate|reach out)/i;
-            const remoteFlag = !localFlag && content.length >= MIN_SCAM_LENGTH
-                ? await isScam(content)
-                : false;
+            const remoteFlag = !localFlag && content.length >= MIN_SCAM_LENGTH ? await isScam(content) : false;
             const flagged = localFlag || remoteFlag;
             if (!flagged)
                 return;
             console.log(`[SCAM] ${author.tag} – rule: ${matchedPattern || (remoteFlag ? 'Gemini' : 'n/a')}`);
             await message.react('⚠️');
-            await message.reply(`<@${OWNER_ID}>, suspicious message.\nCan I jail him? :>`);
+            await message.reply(`<@${currentOwner}>, suspicious message.\nCan I jail him? :>`);
             if (!('createMessageCollector' in message.channel))
                 return;
-            const filter = (m) => m.author.id === OWNER_ID && ['yes', 'no'].includes(m.content.toLowerCase());
+            const filter = (m) => m.author.id === currentOwner && ['yes', 'no'].includes(m.content.toLowerCase());
             const collector = message.channel.createMessageCollector({ filter, time: 300000 });
             collector.on('collect', async (m) => {
                 if (guild && m.content.toLowerCase() === 'yes') {
@@ -197,7 +201,7 @@ function aiBrain() {
             collector.on('end', async (_, reason) => {
                 if (reason === 'time' && guild) {
                     await jailUser(guild, author.id);
-                    await message.reply(`⏰ Time's up (Tokyo didn't reply in 5 mins) — ${author.tag} jailed for safety.`);
+                    await message.reply(`⏰ Time's up – ${author.tag} jailed for safety.`);
                 }
             });
         }
@@ -215,75 +219,77 @@ async function jailUser(guild, userId) {
     const member = await guild.members.fetch(userId);
     await member.roles.set([jailRole]);
 }
-function ask() {
-    exports.asa.on('messageCreate', async (message) => {
-        if (message.author.bot)
-            return;
-        const prefix = '!ask';
-        if (!message.content.startsWith(prefix))
-            return;
-        const prompt = message.content.slice(prefix.length).trim() + exports.systemPrompt;
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) {
-            console.error('GEMINI_API_KEY missing');
-            await message.reply('[ERROR] PLEASE PROVIDE GEMINI API KEY');
-            return;
-        }
-        try {
-            const body = JSON.stringify({
-                contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            });
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body,
-            });
-            if (!res.ok) {
-                const errorText = await res.text();
-                console.error(`[GEMINI API ERROR] ${res.status} ${errorText}`);
-                await message.reply('[ERROR] Error  generating response');
-                return;
-            }
-            const data = await res.json();
-            const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-            await message.reply(responseText || 'I cant generate a reply for that :/');
-        }
-        catch (error) {
-            console.error('[ERROR]', error);
-            await message.reply('Ocurrió un error al procesar tu solicitud.');
-        }
+// Manejador de comandos de texto
+exports.asa.on('messageCreate', async (message) => {
+    if (message.author.bot)
         return;
-    });
-}
-exports.asa.on('messageCreate', (message) => {
-    if (message.content === "test") {
-        message.reply("working");
-        console.log("[TEST PASSED]");
+    if (!message.content.startsWith('!'))
+        return;
+    const args = message.content.slice(1).trim().split(/ +/);
+    const command = args.shift()?.toLowerCase();
+    const guild = message.guild;
+    if (!guild) {
+        return message.reply('[ERROR]');
+    }
+    const guildId = guild.id;
+    // Solo el dueño global puede usar estos comandos
+    if (message.author.id !== OWNER_ID) {
+        return message.reply('[ERROR CODE 8551]: Insufficient permissions');
+    }
+    if (command === 'setowner') {
+        const userMention = args[0];
+        const userId = userMention.replace(/\D/g, ''); // Limpia <@123456789>
+        if (!userId) {
+            return message.reply('[ERROR 404] Please mention a valid user');
+        }
+        serverOwners.set(guildId, userId);
+        await saveOwners();
+        return message.reply(`✅ New owner: <@${userId}>`);
+    }
+    if (command === 'guilds') {
+        const guilds = exports.asa.guilds.cache.map(g => `- ${g.name} (ID: ${g.id})`).join('\n');
+        return message.reply(`[SERVERS]: ${exports.asa.guilds.cache.size}\n${guilds}`);
+    }
+    if (command === 'leave') {
+        const guildIdToLeave = args[0];
+        const guildToLeave = exports.asa.guilds.cache.get(guildIdToLeave);
+        if (!guildToLeave) {
+            return message.reply('[ERROR] Invalid server ID');
+        }
+        await guildToLeave.leave();
+        return message.reply(`✅ Left server: ${guildToLeave.name}`);
+    }
+    if (command === 'invite') {
+        const guildId = args[0];
+        if (!guildId) {
+            return message.reply('[ERROR] Please provide a server ID');
+        }
+        const clientId = exports.asa.user?.id;
+        if (!clientId)
+            return message.reply('[INTERNAL ERROR] Please contact the bot developer.');
+        const inviteLink = `https://discord.com/oauth2/authorize?client_id=${clientId}&permissions=8&scope=bot&guild_id=${guildId}`;
+        await message.author.send(`🔗 Invite link for server \`${guildId}\`:\n${inviteLink}`);
+        await message.reply('✅ Check your DMs.');
     }
 });
+// Webserver básico
+const server = new elysia_1.default({ adapter: (0, node_1.default)() }).listen(3000);
+server.get('/api', () => 'FAKE SERVER BTW');
+(0, console_1.log)('[RUNNING] localhost port 3000');
+// Iniciar bot
 async function startBot() {
+    await loadOwners();
     aiBrain();
-    ask();
     exports.asa.once('ready', () => {
         const guildCount = exports.asa.guilds.cache.size;
         exports.asa.user?.setStatus('dnd');
         exports.asa.user?.setActivity({
             name: ` ${guildCount} server`,
-            type: discord_js_1.ActivityType.Watching
+            type: discord_js_1.ActivityType.Watching,
         });
         (0, console_1.log)('[ONLINE] Logged in as', exports.asa.user?.username);
     });
-    exports.asa.login(process.env.TOKEN);
+    await exports.asa.login(process.env.TOKEN);
 }
-const server = new elysia_1.default({ adapter: (0, node_1.default)() });
-server.listen(3000);
-server.get('/api', () => "FAKE SERVER BTW");
-(0, console_1.log)('[RUNNING] localhost port 3000');
-server.post('/', ({ body }) => {
-    const {} = body;
-    return {
-        message: "Working ?"
-    };
-});
-startBot(); // <- this shit is to run the bot 
+startBot();
 exports.default = exports.asa;
