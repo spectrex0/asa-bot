@@ -277,7 +277,7 @@ async function startBot() {
 }
 const server = new elysia_1.default({ adapter: (0, node_1.default)() });
 server.listen(3000);
-server.get('/', () => "FAKE SERVER BTW");
+server.get('/api', () => "FAKE SERVER BTW");
 (0, console_1.log)('[RUNNING] localhost port 3000');
 server.post('/', ({ body }) => {
     const {} = body;
