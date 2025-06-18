@@ -12,6 +12,7 @@ const node_1 = __importDefault(require("@elysiajs/node"));
 const elysia_1 = __importDefault(require("elysia"));
 const promises_1 = require("fs/promises");
 const path_1 = require("path");
+const cors_1 = __importDefault(require("@elysiajs/cors"));
 const undici_1 = require("undici");
 // Cargar variables de entorno
 dotenv_1.default.config();
@@ -219,7 +220,6 @@ async function jailUser(guild, userId) {
     const member = await guild.members.fetch(userId);
     await member.roles.set([jailRole]);
 }
-// Manejador de comandos de texto
 exports.asa.on('messageCreate', async (message) => {
     if (message.author.bot)
         return;
@@ -232,19 +232,18 @@ exports.asa.on('messageCreate', async (message) => {
         return message.reply('[ERROR]');
     }
     const guildId = guild.id;
-    // Solo el dueño global puede usar estos comandos
     if (message.author.id !== OWNER_ID) {
         return message.reply('[ERROR CODE 8551]: Insufficient permissions');
     }
     if (command === 'setowner') {
         const userMention = args[0];
-        const userId = userMention.replace(/\D/g, ''); // Limpia <@123456789>
+        const userId = userMention.replace(/\D/g, '');
         if (!userId) {
             return message.reply('[ERROR 404] Please mention a valid user');
         }
         serverOwners.set(guildId, userId);
         await saveOwners();
-        return message.reply(`✅ New owner: <@${userId}>`);
+        return message.reply(`✅ Owner set: <@${userId}>`);
     }
     if (command === 'guilds') {
         const guilds = exports.asa.guilds.cache.map(g => `- ${g.name} (ID: ${g.id})`).join('\n');
@@ -259,24 +258,19 @@ exports.asa.on('messageCreate', async (message) => {
         await guildToLeave.leave();
         return message.reply(`✅ Left server: ${guildToLeave.name}`);
     }
-    if (command === 'invite') {
-        const guildId = args[0];
-        if (!guildId) {
-            return message.reply('[ERROR] Please provide a server ID');
-        }
-        const clientId = exports.asa.user?.id;
-        if (!clientId)
-            return message.reply('[INTERNAL ERROR] Please contact the bot developer.');
-        const inviteLink = `https://discord.com/oauth2/authorize?client_id=${clientId}&permissions=8&scope=bot&guild_id=${guildId}`;
-        await message.author.send(`🔗 Invite link for server \`${guildId}\`:\n${inviteLink}`);
-        await message.reply('✅ Check your DMs.');
-    }
 });
-// Webserver básico
 const server = new elysia_1.default({ adapter: (0, node_1.default)() }).listen(3000);
-server.get('/api', () => 'FAKE SERVER BTW');
+server.get('/api', () => {
+    return {
+        message: "Fake backend running "
+    };
+});
+server.use((0, cors_1.default)({
+    origin: ["https://codersresources.vercel.app"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: false,
+}));
 (0, console_1.log)('[RUNNING] localhost port 3000');
-// Iniciar bot
 async function startBot() {
     await loadOwners();
     aiBrain();
