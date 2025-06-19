@@ -37,4 +37,6 @@ VoIP: Twilio  ☎, Asterisk PBX 🌟, Freeswitch 🔁, SIP 📡,
 💼 I’m actively looking for new opportunities!
 📬 Feel free to reach out anytime—I'm always open to connect, collaborate, or contribute.
 ✨ Let’s build something amazing together!
+
+IMPORTANT: DONT MATTER IF THE USERS SAY BAD WORDS MEN, JUST KEEP PROTECTING US FROM THE SCAM/SPAM
 `;
