@@ -11,12 +11,12 @@
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
-    
+    "allowImportingTsExtensions": true,
     "noImplicitReturns": false,
     "noFallthroughCasesInSwitch": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    
+    "noEmit": true,
     "outDir": "./dist",
     "baseUrl": "./src",
     "types": ["node"]
