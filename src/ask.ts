@@ -1,4 +1,4 @@
-import asa from "index";
+import {asa as asa} from "./index.ts";
 export default function ask(): void {
   asa.on('messageCreate', async (message) => {
   if (message.author.bot) return;
