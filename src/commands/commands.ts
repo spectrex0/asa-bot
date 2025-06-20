@@ -73,11 +73,11 @@ export default function Commands() {
         let jailRole;
         try {
           jailRole = message.guild.roles.cache.find(
-            (role) => role.name === "jail"
+            (role) => role.name === "Jail"
           );
           if (!jailRole) {
             jailRole = await message.guild.roles.create({
-              name: "jail",
+              name: "Jail",
               color: "Grey",
               reason: "Role for jailed users",
               permissions: [],
@@ -153,6 +153,31 @@ export default function Commands() {
         }
 
         return message.reply("✅ Jail role and channel have been set up.");
+      }
+
+      // Join
+      if (command === "join") {
+        const inviteCodeOrUrl = args[0];
+        if (!inviteCodeOrUrl || typeof inviteCodeOrUrl !== "string") {
+          return message.reply("[ERROR] Please provide a valid invite link or code.");
+        }
+        try {
+          // Extract invite code if a full URL is provided
+          const inviteCode = inviteCodeOrUrl.match(/discord\.gg\/([\w-]+)/)
+        ? inviteCodeOrUrl.split("discord.gg/")[1].split(/[/?]/)[0]
+        : inviteCodeOrUrl;
+          const invite = await asa.fetchInvite(inviteCode);
+          if (!invite) {
+        return message.reply("[ERROR] Invalid or expired invite.");
+          }
+          // Bots cannot join servers via invite links programmatically; they must be invited via OAuth2.
+          return message.reply("[ERROR] Bots cannot join servers via invite links. Please invite the bot using its OAuth2 URL.");
+        } catch (err: any) {
+          if (err.message?.includes("401") || err.message?.includes("403")) {
+        return message.reply("[ERROR] I do not have permission to join this server.");
+          }
+          return message.reply("[ERROR] Could not join the server. The invite may be invalid or expired.");
+        }
       }
 
       // Leave
