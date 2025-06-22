@@ -1,7 +1,7 @@
 import cors from "@elysiajs/cors";
 import node from "@elysiajs/node";
 import { log } from "console";
-import sendRequest from "events/sendRequest.ts";
+import sendRequest from "./events/sendRequest.ts";
 import type { Message as DiscordMessage } from "discord.js";
 import {
   ActivityType,
