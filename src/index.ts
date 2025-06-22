@@ -1,6 +1,7 @@
 import cors from "@elysiajs/cors";
 import node from "@elysiajs/node";
 import { log } from "console";
+import sendRequest from "events/sendRequest.ts";
 import type { Message as DiscordMessage } from "discord.js";
 import {
   ActivityType,
@@ -33,8 +34,8 @@ const SCAM_RULES_PATH = join(__dirname, "scamPatterns.json");
 const GEMINI_MODEL = "gemini-2.0-flash";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const MIN_SCAM_LENGTH = 15;
-const SPAM_LIMIT = 5;
-const SPAM_INTERVAL = 10_000;
+const SPAM_LIMIT = 4;
+const SPAM_INTERVAL = 5_000;
 
 interface ScamRule {
   pattern: string;
@@ -69,7 +70,7 @@ async function isScam(message: string): Promise<boolean> {
     return false;
   }
 
-  const prompt = systemPrompt + "\n\n" + message;
+  const prompt = systemPrompt + "\n knowing that u need to verify this: \n" + message;
   const body = JSON.stringify({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
   });
@@ -83,7 +84,7 @@ async function isScam(message: string): Promise<boolean> {
 
     if (!res.ok) {
       console.error(
-        `[isScam] Gemini API error: ${res.status} ${res.statusText}`
+        `[isScam] API error: ${res.status} ${res.statusText}`
       );
       return false;
     }
@@ -146,7 +147,7 @@ function aiBrain() {
 
     console.log(
       `[SCAM] ${author.tag} – rule: ${
-        matchedPattern || (remoteFlag ? "Gemini" : "n/a")
+        matchedPattern || (remoteFlag ? "asa" : "n/a")
       }`
     );
 
@@ -200,12 +201,13 @@ async function startBot() {
   aiBrain();
   Commands();
   ask()
+  sendRequest() // to keep alive my backend :>
   asa.once("ready", () => {
-    const guildCount = asa.guilds.cache.size;
-    asa.user?.setStatus("dnd");
+    // const guildCount = asa.guilds.cache.size;
+    asa.user?.setStatus("online");
     asa.user?.setActivity({
-      name: ` ${guildCount} server`,
-      type: ActivityType.Watching,
+      name: `with TypeScript`,
+      type: ActivityType.Playing,
     });
     log("[ONLINE] Anti Scam Agent", asa.user?.username);
   });
