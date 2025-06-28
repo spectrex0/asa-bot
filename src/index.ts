@@ -16,6 +16,7 @@ import { readFile } from "fs/promises";
 import { join } from "path";
 import { fetch as httpFetch } from "undici";
 import Commands from "./commands/commands.ts";
+import onDel from "./events/messageDelete.ts";
 import { systemPrompt } from "./prompt.ts";
 import ask from "./ask.ts";
 dotenv.config();
@@ -195,13 +196,14 @@ server.get("/api", () => ({
   message: "👨‍💻",
 }));
 server.use(cors());
-log("[RUNNING] localhost port 3000");
+log("[BACKEND] port 3000");
 
 async function startBot() {
   aiBrain();
+  onDel()
   Commands();
   ask()
-  sendRequest() // to keep alive my backend :>
+  sendRequest() 
   asa.once("ready", () => {
     // const guildCount = asa.guilds.cache.size;
     asa.user?.setStatus("online");
@@ -209,7 +211,7 @@ async function startBot() {
       name: `with TypeScript`,
       type: ActivityType.Playing,
     });
-    log("[ONLINE] Anti Scam Agent", asa.user?.username);
+    log("[ONLINE] Anti Tash ppl / Scam Agent", asa.user?.username);
   });
 
   await asa.login(process.env.TOKEN);
