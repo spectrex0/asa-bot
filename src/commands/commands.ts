@@ -111,7 +111,7 @@ export default function Commands() {
         let jailChannel;
         try {
           jailChannel = message.guild.channels.cache.find(
-            (ch) => ch.name === "🔒|jail" && ch.type === 0
+            (ch) => ch.name === "jail" && ch.type === 0
           );
           if (!jailChannel) {
             jailChannel = await message.guild.channels.create({

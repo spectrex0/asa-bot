@@ -42,7 +42,6 @@ export default function ask(): void {
     await message.reply('Ocurrió un error al procesar tu solicitud.');
   }
 
-  // <- agrega un return si quieres eliminar el warning
   return;
 });
 
