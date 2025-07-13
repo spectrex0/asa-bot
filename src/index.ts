@@ -219,3 +219,12 @@ async function startBot() {
 
 startBot();
 export default asa;
+setInterval(async () => {
+  try {
+    const res = await fetch('https://bumprs.onrender.com/api'); 
+    const data = await res.json();
+    console.log(data)
+  } catch (err) {
+    
+  }
+}, 300000);
