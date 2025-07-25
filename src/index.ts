@@ -19,6 +19,7 @@ import Commands from "./commands/commands.ts";
 import onDel from "./events/messageDelete.ts";
 import { systemPrompt } from "./prompt.ts";
 import ask from "./ask.ts";
+import startClient from "./stalkerBot/main.ts";
 dotenv.config();
 
 export const asa = new Client({
@@ -203,6 +204,7 @@ async function startBot() {
   onDel()
   Commands();
   ask()
+  startClient
   sendRequest() 
   asa.once("ready", () => {
     // const guildCount = asa.guilds.cache.size;
