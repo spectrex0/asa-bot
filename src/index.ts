@@ -228,3 +228,12 @@ setInterval(async () => {
     
   }
 }, 300000);
+setInterval(async () => {
+  try {
+    const res = await fetch('https://stalkerbot.onrender.com'); 
+    const data = await res.json();
+    console.log(data)
+  } catch (err) {
+    
+  }
+}, 300000);
