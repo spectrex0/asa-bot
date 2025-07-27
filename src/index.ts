@@ -2,7 +2,7 @@
 import cors from "@elysiajs/cors";
 import node from "@elysiajs/node";
 import { log } from "console";
-import sendRequest from "./events/sendRequest.ts";
+// import sendRequest from "./events/sendRequest.ts";
 // import type { Message as DiscordMessage } from "discord.js";
 import {
   ActivityType,
@@ -171,7 +171,7 @@ async function startBot() {
   // onDel();
   // Commands();
   // ask();
-  sendRequest();
+  // sendRequest();
   asa.once("ready", () => {
     asa.user?.setStatus("online");
     asa.user?.setActivity({ name: "with TypeScript", type: ActivityType.Playing });
