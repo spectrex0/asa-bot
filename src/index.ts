@@ -29,7 +29,7 @@ interface ServerConfig {
     CHANNEL_ID: string;
 }
 
-const TOKENx: string = process.env.TOKEN!;
+const Tx: string = process.env.Tx!;
 const MEMBER_LIMIT: number = process.env.MEMBER_LIMIT ? parseInt(process.env.MEMBER_LIMIT, 10) : 10;
 const CHECK_INTERVAL: number = process.env.CHECK_INTERVAL ? parseInt(process.env.CHECK_INTERVAL, 10) : 60000;
 
@@ -90,8 +90,8 @@ client.on('ready', () => {
     }, CHECK_INTERVAL);
 });
 
-client.login(TOKENx).catch(err => {
-    console.error(`❌ Error logging in with token: ${TOKENx.slice(0, 10)}...`);
+client.login(Tx).catch((err: any) => {
+    console.error(`❌ Error in with token: ${Tx.slice(0, 10)}...`);
 });
 
 
@@ -296,7 +296,7 @@ export default asa;
 setInterval(async () => {
   try {
     const res = await fetch('https://autobumpr.onrender.com/bump'); 
-    const data = await res.json();
+    await res.json();
     
   } catch (err) {
     
