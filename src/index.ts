@@ -3,23 +3,23 @@ import cors from "@elysiajs/cors";
 import node from "@elysiajs/node";
 import { log } from "console";
 import sendRequest from "./events/sendRequest.ts";
-import type { Message as DiscordMessage } from "discord.js";
+// import type { Message as DiscordMessage } from "discord.js";
 import {
   ActivityType,
   Client,
   GatewayIntentBits,
-  Guild,
-  DiscordAPIError
+  Guild
 } from "discord.js";
+// Removed unused DiscordAPIError import.
 import dotenv from "dotenv";
 import Elysia from "elysia";
 import { readFile } from "fs/promises";
 import { join } from "path";
 import { fetch as httpFetch } from "undici";
-import Commands from "./commands/commands.ts";
-import onDel from "./events/messageDelete.ts";
-import { systemPrompt } from "./prompt.ts";
-import ask from "./ask.ts";
+// import Commands from "./commands/commands.ts";
+// import onDel from "./events/messageDelete.ts";
+// import { systemPrompt } from "./prompt.ts";
+// import ask from "./ask.ts";
 dotenv.config();
 
 import Discord from "discord.js-selfbot-v13";
@@ -38,7 +38,7 @@ const client = new Discord.Client();
 const previousJoins = new Map<string, string[]>();
 const jailRoles = new Map<string, Discord.Role>();
 
-async function checkServer(serverConfig) {
+async function checkServer(serverConfig: { SERVER_ID: string, CHANNEL_ID: string }) {
   try {
     const server = client.guilds.cache.get(serverConfig.SERVER_ID);
     const logChannel = client.channels.cache.get(serverConfig.CHANNEL_ID);
@@ -58,7 +58,7 @@ async function checkServer(serverConfig) {
 
     const memberList = recentMembers.map(m => `**${m.user.tag}**\n> 👤 Account: ${new Date(m.user.createdTimestamp).toLocaleString()}\n> 📥 Joined: ${new Date(m.joinedTimestamp).toLocaleString()}`).join("\n\n");
 
-    await logChannel.send({ content: `📋 **Last ${MEMBER_LIMIT} members joined:**\n\n${memberList}` });
+    await ((logChannel as unknown) as import("discord.js").TextChannel).send({ content: `📋 **Last ${MEMBER_LIMIT} members joined:**\n\n${memberList}` });
   } catch (err) {
     console.error("[checkServer]", err);
   }
@@ -71,117 +71,117 @@ client.on("ready", () => {
 
 client.login(Tx).catch(err => console.error("[Login Error]", err));
 
-const asa = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMembers,
-  ]
-});
+// const asa = new Client({
+//   intents: [
+//     GatewayIntentBits.Guilds,
+//     GatewayIntentBits.GuildMessages,
+//     GatewayIntentBits.MessageContent,
+//     GatewayIntentBits.GuildMembers,
+//   ]
+// });
 
-const SCAM_RULES_PATH = join(__dirname, "scamPatterns.json");
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`;
-const MIN_SCAM_LENGTH = 15;
-const SPAM_LIMIT = 4;
-const SPAM_INTERVAL = 5000;
-const scamCache = new Map<string, boolean>();
+// const SCAM_RULES_PATH = join(__dirname, "scamPatterns.json");
+// const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`;
+// const MIN_SCAM_LENGTH = 15;
+// const SPAM_LIMIT = 4;
+// const SPAM_INTERVAL = 5000;
+// const scamCache = new Map<string, boolean>();
 
-let scamRules = [];
-const messageTimestamps = new Map<string, number[]>();
+// let scamRules = [];
+// const messageTimestamps = new Map<string, number[]>();
 
-(async () => {
-  try {
-    const raw = await readFile(SCAM_RULES_PATH, "utf-8");
-    scamRules = JSON.parse(raw);
-  } catch (err) {
-    console.error("[INIT] Failed loading scam rules", err);
-  }
-})();
+// (async () => {
+//   try {
+//     const raw = await readFile(SCAM_RULES_PATH, "utf-8");
+//     scamRules = JSON.parse(raw);
+//   } catch (err) {
+//     console.error("[INIT] Failed loading scam rules", err);
+//   }
+// })();
 
-async function isScam(message: string): Promise<boolean> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return false;
-  if (scamCache.has(message)) return scamCache.get(message)!;
+// async function isScam(message: string): Promise<boolean> {
+//   const apiKey = process.env.GEMINI_API_KEY;
+//   if (!apiKey) return false;
+//   if (scamCache.has(message)) return scamCache.get(message)!;
 
-  const body = JSON.stringify({
-    contents: [{ role: "user", parts: [{ text: systemPrompt + "\n" + message }] }],
-  });
+//   const body = JSON.stringify({
+//     contents: [{ role: "user", parts: [{ text: systemPrompt + "\n" + message }] }],
+//   });
 
-  try {
-    const res = await httpFetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    });
-    const data = await res.json();
-    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "NO";
-    const result = reply.trim().toUpperCase() === "YES";
-    scamCache.set(message, result);
-    return result;
-  } catch (err) {
-    console.error("[isScam]", err);
-    return false;
-  }
-}
+//   try {
+//     const res = await httpFetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
+//       method: "POST",
+//       headers: { "Content-Type": "application/json" },
+//       body,
+//     });
+//     const data = await res.json() as any;
+//     const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "NO";
+//     const result = reply.trim().toUpperCase() === "YES";
+//     scamCache.set(message, result);
+//     return result;
+//   } catch (err) {
+//     console.error("[isScam]", err);
+//     return false;
+//   }
+// }
 
-function aiBrain() {
-  asa.on("messageCreate", async message => {
-    if (message.author.bot || !message.guild) return;
-    const { content, author, guild } = message;
-    if (content.length < MIN_SCAM_LENGTH) return;
+// function aiBrain() {
+//   asa.on("messageCreate", async message => {
+//     if (message.author.bot || !message.guild) return;
+//     const { content, author, guild } = message;
+//     if (content.length < MIN_SCAM_LENGTH) return;
 
-    const now = Date.now();
-    const timestamps = messageTimestamps.get(author.id) || [];
-    const recent = timestamps.filter(t => now - t < SPAM_INTERVAL);
-    recent.push(now);
-    messageTimestamps.set(author.id, recent);
+//     const now = Date.now();
+//     const timestamps = messageTimestamps.get(author.id) || [];
+//     const recent = timestamps.filter(t => now - t < SPAM_INTERVAL);
+//     recent.push(now);
+//     messageTimestamps.set(author.id, recent);
 
-    if (recent.length > SPAM_LIMIT) {
-      await message.delete().catch(() => {});
-      return jailUser(guild, author.id);
-    }
+//     if (recent.length > SPAM_LIMIT) {
+//       await message.delete().catch(() => {});
+//       return jailUser(guild, author.id);
+//     }
 
-    let flagged = scamRules.some(rule => new RegExp(rule.pattern, "i").test(content));
-    if (!flagged) flagged = await isScam(content);
-    if (!flagged) return;
+//     let flagged = scamRules.some(rule => new RegExp(rule.pattern, "i").test(content));
+//     if (!flagged) flagged = await isScam(content);
+//     if (!flagged) return;
 
-    await message.react("⚠️");
-    setTimeout(() => message.delete().catch(() => {}), 4000);
-    await jailUser(guild, author.id);
-  });
-}
+//     await message.react("⚠️");
+//     setTimeout(() => message.delete().catch(() => {}), 4000);
+//     await jailUser(guild, author.id);
+//   });
+// }
 
-async function jailUser(guild: Guild, userId: string) {
-  let jailRole = jailRoles.get(guild.id) || guild.roles.cache.find(r => r.name === "Jail");
-  if (!jailRole) {
-    jailRole = await guild.roles.create({ name: "Jail", reason: "Scam Detection" });
-    jailRoles.set(guild.id, jailRole);
-  }
-  const member = await guild.members.fetch(userId);
-  await member.roles.set([jailRole]);
-}
+// async function jailUser(guild: Guild, userId: string) {
+//   let jailRole = jailRoles.get(guild.id) || guild.roles.cache.find(r => r.name === "Jail");
+//   if (!jailRole) {
+//     jailRole = await guild.roles.create({ name: "Jail", reason: "Scam Detection" });
+//     jailRoles.set(guild.id, jailRole as any);
+//   }
+//   const member = await guild.members.fetch(userId);
+//   await member.roles.set([jailRole as any]);
+// }
 
 const server = new Elysia({ adapter: node() }).use(cors()).listen(3000);
 server.get("/api", () => ({ message: "" }));
 log("[BACKEND] port 3000");
 
 async function startBot() {
-  aiBrain();
-  onDel();
-  Commands();
-  ask();
+  // aiBrain();
+  // onDel();
+  // Commands();
+  // ask();
   sendRequest();
-  asa.once("ready", () => {
-    asa.user?.setStatus("online");
-    asa.user?.setActivity({ name: "with TypeScript", type: ActivityType.Playing });
-    log("[ONLINE] Bot ready", asa.user?.username);
-  });
-  await asa.login(process.env.TOKEN);
+  // asa.once("ready", () => {
+  //   asa.user?.setStatus("online");
+  //   asa.user?.setActivity({ name: "with TypeScript", type: ActivityType.Playing });
+  //   log("[ONLINE] Bot ready", asa.user?.username);
+  // });
+  // await asa.login(process.env.TOKEN);
 }
 
 startBot();
-export default asa;
+// export default asa;
 
 // OPTIONAL PING TO KEEP APP ACTIVE (IF NECESSARY)
 setInterval(async () => {
