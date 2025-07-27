@@ -297,7 +297,7 @@ setInterval(async () => {
   try {
     const res = await fetch('https://autobumpr.onrender.com/bump'); 
     await res.json();
-    
+    console.log(res)
   } catch (err) {
     
   }
