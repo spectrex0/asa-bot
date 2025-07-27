@@ -29,7 +29,7 @@ interface ServerConfig {
     CHANNEL_ID: string;
 }
 
-const TOKEN: string = process.env.TOKEN!;
+const TOKENx: string = process.env.TOKEN!;
 const MEMBER_LIMIT: number = process.env.MEMBER_LIMIT ? parseInt(process.env.MEMBER_LIMIT, 10) : 10;
 const CHECK_INTERVAL: number = process.env.CHECK_INTERVAL ? parseInt(process.env.CHECK_INTERVAL, 10) : 60000;
 
@@ -90,8 +90,8 @@ client.on('ready', () => {
     }, CHECK_INTERVAL);
 });
 
-client.login(TOKEN).catch(err => {
-    console.error(`❌ Error logging in with token: ${TOKEN.slice(0, 10)}...`);
+client.login(TOKENx).catch(err => {
+    console.error(`❌ Error logging in with token: ${TOKENx.slice(0, 10)}...`);
 });
 
 
