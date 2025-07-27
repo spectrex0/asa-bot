@@ -1,3 +1,4 @@
+// OPTIMIZED VERSION OF YOUR DISCORD BOT CODE
 import cors from "@elysiajs/cors";
 import node from "@elysiajs/node";
 import { log } from "console";
@@ -6,9 +7,9 @@ import type { Message as DiscordMessage } from "discord.js";
 import {
   ActivityType,
   Client,
-  DiscordAPIError,
   GatewayIntentBits,
   Guild,
+  DiscordAPIError
 } from "discord.js";
 import dotenv from "dotenv";
 import Elysia from "elysia";
@@ -21,133 +22,90 @@ import { systemPrompt } from "./prompt.ts";
 import ask from "./ask.ts";
 dotenv.config();
 
-
-import Discord from 'discord.js-selfbot-v13';
-
-interface ServerConfig {
-    SERVER_ID: string;
-    CHANNEL_ID: string;
-}
+import Discord from "discord.js-selfbot-v13";
 
 const Tx: string = process.env.Tx!;
-const MEMBER_LIMIT: number = process.env.MEMBER_LIMIT ? parseInt(process.env.MEMBER_LIMIT, 10) : 10;
-const CHECK_INTERVAL: number = process.env.CHECK_INTERVAL ? parseInt(process.env.CHECK_INTERVAL, 10) : 60000;
+const MEMBER_LIMIT = parseInt(process.env.MEMBER_LIMIT || "10", 10);
+const CHECK_INTERVAL = parseInt(process.env.CHECK_INTERVAL || "60000", 10);
 
-let serversEnv = process.env.SERVERS || '[]';
+let serversEnv = process.env.SERVERS || "[]";
 if (serversEnv.startsWith("'") && serversEnv.endsWith("'")) {
-    serversEnv = serversEnv.slice(1, -1);
+  serversEnv = serversEnv.slice(1, -1);
 }
-const SERVERS: ServerConfig[] = JSON.parse(serversEnv);
+const SERVERS = JSON.parse(serversEnv);
 
 const client = new Discord.Client();
-const previousJoins: Map<string, string[]> = new Map();
+const previousJoins = new Map<string, string[]>();
+const jailRoles = new Map<string, Discord.Role>();
 
-async function checkServer(serverConfig: ServerConfig): Promise<void> {
-    try {
-        const server = client.guilds.cache.get(serverConfig.SERVER_ID);
-        const logChannel = client.channels.cache.get(serverConfig.CHANNEL_ID) as Discord.TextChannel | undefined;
+async function checkServer(serverConfig) {
+  try {
+    const server = client.guilds.cache.get(serverConfig.SERVER_ID);
+    const logChannel = client.channels.cache.get(serverConfig.CHANNEL_ID);
 
-        if (!server || !logChannel) {
-            console.error(`[${client.user?.tag}] Server or channel not found for ID ${serverConfig.SERVER_ID}.`);
-            return;
-        }
+    if (!server || !logChannel) return;
 
-        const members = await server.members.fetch();
-        const sortedMembers = members
-            .filter(m => m.joinedTimestamp !== null && m.joinedTimestamp !== undefined)
-            .sort((a, b) => (b.joinedTimestamp || 0) - (a.joinedTimestamp || 0));
+    const members = await server.members.fetch();
+    const sortedMembers = members.filter(m => m.joinedTimestamp).sort((a, b) => b.joinedTimestamp - a.joinedTimestamp);
 
-        const limit = MEMBER_LIMIT > 0 ? MEMBER_LIMIT : 10;
-        const recentMembers = sortedMembers.first(limit);
-        const currentJoinIds = recentMembers.map(m => m.id);
-        const previousJoinIds = previousJoins.get(server.id) || [];
+    const recentMembers = sortedMembers.first(MEMBER_LIMIT);
+    const currentJoinIds = recentMembers.map(m => m.id);
+    const previousJoinIds = previousJoins.get(server.id) || [];
 
-        if (JSON.stringify(currentJoinIds) === JSON.stringify(previousJoinIds)) return;
+    if (JSON.stringify(currentJoinIds) === JSON.stringify(previousJoinIds)) return;
 
-        previousJoins.set(server.id, currentJoinIds);
+    previousJoins.set(server.id, currentJoinIds);
 
-        const memberList = recentMembers.map(member => {
-            return `**${member.user.tag}**\n` +
-                `> 👤 Account created: ${new Date(member.user.createdTimestamp).toLocaleString()}\n` +
-                `> 📥 Joined: ${new Date(member.joinedTimestamp!).toLocaleString()}`;
-        }).join("\n\n");
+    const memberList = recentMembers.map(m => `**${m.user.tag}**\n> 👤 Account: ${new Date(m.user.createdTimestamp).toLocaleString()}\n> 📥 Joined: ${new Date(m.joinedTimestamp).toLocaleString()}`).join("\n\n");
 
-        await logChannel.send({
-            content: `📋 **Last ${limit} members who joined ${server.name}:**\n\n${memberList}\n\n----------------------------------------------------`
-        });
-
-    } catch (error) {
-        console.error(`[${client.user?.tag}] Error in checkServer for ${serverConfig.SERVER_ID}:`, error);
-    }
+    await logChannel.send({ content: `📋 **Last ${MEMBER_LIMIT} members joined:**\n\n${memberList}` });
+  } catch (err) {
+    console.error("[checkServer]", err);
+  }
 }
 
-client.on('ready', () => {
-    console.log(`✅ Connected as ${client.user?.tag}`);
-
-    SERVERS.forEach(srv => checkServer(srv));
-    setInterval(() => {
-        SERVERS.forEach(srv => checkServer(srv));
-    }, CHECK_INTERVAL);
+client.on("ready", () => {
+  console.log(`✅ Connected as ${client.user?.tag}`);
+  setInterval(() => Promise.all(SERVERS.map(checkServer)), CHECK_INTERVAL);
 });
 
-client.login(Tx).catch((err: any) => {
-    console.error(`❌ Error logging in with token: ${err.message}`);
-});
+client.login(Tx).catch(err => console.error("[Login Error]", err));
 
-
-export const asa = new Client({
+const asa = new Client({
   intents: [
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildMessages,
     GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMessageTyping,
-  ],
+    GatewayIntentBits.GuildMembers,
+  ]
 });
 
 const SCAM_RULES_PATH = join(__dirname, "scamPatterns.json");
-const GEMINI_MODEL = "gemini-2.0-flash";
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`;
 const MIN_SCAM_LENGTH = 15;
 const SPAM_LIMIT = 4;
-const SPAM_INTERVAL = 5_000;
+const SPAM_INTERVAL = 5000;
+const scamCache = new Map<string, boolean>();
 
-interface ScamRule {
-  pattern: string;
-  content: string;
-}
-
-interface GeminiResponse {
-  candidates?: {
-    content?: {
-      parts?: { text?: string }[];
-    };
-  }[];
-}
-
-let scamRules: ScamRule[] = [];
+let scamRules = [];
 const messageTimestamps = new Map<string, number[]>();
 
-(async function loadScamRules() {
+(async () => {
   try {
     const raw = await readFile(SCAM_RULES_PATH, "utf-8");
-    scamRules = JSON.parse(raw) as ScamRule[];
-    console.log(`[INIT] Loaded ${scamRules.length} scam patterns`);
+    scamRules = JSON.parse(raw);
   } catch (err) {
-    console.error("[INIT] Failed to load scamPatterns.json", err);
+    console.error("[INIT] Failed loading scam rules", err);
   }
 })();
 
 async function isScam(message: string): Promise<boolean> {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    console.error("[isScam] GEMINI_API_KEY env var missing");
-    return false;
-  }
+  if (!apiKey) return false;
+  if (scamCache.has(message)) return scamCache.get(message)!;
 
-  const prompt = systemPrompt + "\n knowing that u need to verify this: \n" + message;
   const body = JSON.stringify({
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    contents: [{ role: "user", parts: [{ text: systemPrompt + "\n" + message }] }],
   });
 
   try {
@@ -156,158 +114,82 @@ async function isScam(message: string): Promise<boolean> {
       headers: { "Content-Type": "application/json" },
       body,
     });
-
-    if (!res.ok) {
-      console.error(
-        `[isScam] API error: ${res.status} ${res.statusText}`
-      );
-      return false;
-    }
-
-    const data = (await res.json()) as GeminiResponse;
-    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "No";
-    return reply.trim().toUpperCase() === "YES";
+    const data = await res.json();
+    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "NO";
+    const result = reply.trim().toUpperCase() === "YES";
+    scamCache.set(message, result);
+    return result;
   } catch (err) {
-    console.error("[isScam] Request failed:", err);
+    console.error("[isScam]", err);
     return false;
   }
 }
 
 function aiBrain() {
-  asa.on("messageCreate", async (message: DiscordMessage) => {
+  asa.on("messageCreate", async message => {
     if (message.author.bot || !message.guild) return;
-
-    const content = message.content.trim();
-    const author = message.author;
-    const guild = message.guild;
-
-    if (content.toLowerCase() === "asa who are u?" && process.env.AUTHOR) {
-      await message.reply("I'm top 2 scammers hater.");
-      return;
-    }
+    const { content, author, guild } = message;
+    if (content.length < MIN_SCAM_LENGTH) return;
 
     const now = Date.now();
-    const list = messageTimestamps.get(author.id) || [];
-    const recent = list.filter((t) => now - t < SPAM_INTERVAL);
+    const timestamps = messageTimestamps.get(author.id) || [];
+    const recent = timestamps.filter(t => now - t < SPAM_INTERVAL);
     recent.push(now);
     messageTimestamps.set(author.id, recent);
 
     if (recent.length > SPAM_LIMIT) {
-      await message.delete();
-      if (guild) await jailUser(guild, author.id);
-      return;
+      await message.delete().catch(() => {});
+      return jailUser(guild, author.id);
     }
 
-    if (content.length < MIN_SCAM_LENGTH) return;
-
-    let localFlag = false;
-    let matchedPattern = "";
-
-    for (const r of scamRules) {
-      const regex = new RegExp(r.pattern, "i");
-      if (regex.test(content)) {
-        localFlag = true;
-        matchedPattern = r.pattern;
-        break;
-      }
-    }
-
-    const remoteFlag =
-      !localFlag && content.length >= MIN_SCAM_LENGTH
-        ? await isScam(content)
-        : false;
-    const flagged = localFlag || remoteFlag;
-
+    let flagged = scamRules.some(rule => new RegExp(rule.pattern, "i").test(content));
+    if (!flagged) flagged = await isScam(content);
     if (!flagged) return;
 
-    console.log(
-      `[SCAM] ${author.tag} – rule: ${
-        matchedPattern || (remoteFlag ? "asa" : "n/a")
-      }`
-    );
-
     await message.react("⚠️");
-    setTimeout(() => {
-      message.delete(); //  delete message if is detected as scam
-    }, 4000);
-
-    // await message.reply(`<@${author.id}> that was really stupid 💀`);
+    setTimeout(() => message.delete().catch(() => {}), 4000);
     await jailUser(guild, author.id);
   });
 }
 
-async function jailUser(guild: Guild, userId: string): Promise<void> {
-  const roleName = "Jail";
-  let jailRole = guild.roles.cache.find((r) => r.name === roleName);
-
+async function jailUser(guild: Guild, userId: string) {
+  let jailRole = jailRoles.get(guild.id) || guild.roles.cache.find(r => r.name === "Jail");
   if (!jailRole) {
-    try {
-      jailRole = await guild.roles.create({
-        name: roleName,
-        reason: "Role for suspicious users",
-      });
-    } catch (err) {
-      console.error("[ERROR] Could not create Jail role", err);
-      return;
-    }
+    jailRole = await guild.roles.create({ name: "Jail", reason: "Scam Detection" });
+    jailRoles.set(guild.id, jailRole);
   }
-
-  try {
-    const member = await guild.members.fetch(userId);
-    await member.roles.set([jailRole]);
-    console.log(`[JAIL] Successfully jailed user: ${member.user.tag}`);
-  } catch (err) {
-    if (err instanceof DiscordAPIError) {
-      console.error(`[JAIL] Discord API Error: ${err.message}`);
-    } else {
-      console.error(`[JAIL] Unexpected error:`, err);
-    }
-  }
+  const member = await guild.members.fetch(userId);
+  await member.roles.set([jailRole]);
 }
 
-const server = new Elysia({ adapter: node() }).listen(3000);
-server.get("/api", () => ({
-  message: "",
-}));
-server.use(cors());
+const server = new Elysia({ adapter: node() }).use(cors()).listen(3000);
+server.get("/api", () => ({ message: "" }));
 log("[BACKEND] port 3000");
 
 async function startBot() {
   aiBrain();
-  onDel()
+  onDel();
   Commands();
-  ask()
-  sendRequest() 
+  ask();
+  sendRequest();
   asa.once("ready", () => {
-    // const guildCount = asa.guilds.cache.size;
     asa.user?.setStatus("online");
-    asa.user?.setActivity({
-      name: `with TypeScript`,
-      type: ActivityType.Playing,
-    });
-    log("[ONLINE] Anti Tash ppl / Scam Agent", asa.user?.username);
+    asa.user?.setActivity({ name: "with TypeScript", type: ActivityType.Playing });
+    log("[ONLINE] Bot ready", asa.user?.username);
   });
-
   await asa.login(process.env.TOKEN);
 }
 
 startBot();
 export default asa;
+
+// OPTIONAL PING TO KEEP APP ACTIVE (IF NECESSARY)
 setInterval(async () => {
   try {
-    const res = await fetch('https://autobumpr.onrender.com/bump'); 
-    await res.json();
-    console.log(res)
+    const res = await httpFetch("https://autobumpr.onrender.com/bump");
+    const data = await res.json();
+    console.log(data);
   } catch (err) {
-    
+    console.error("[PING ERROR]", err);
   }
 }, 300000);
-// setInterval(async () => {
-//   try {
-//     const res = await fetch('https://stalkerbot.onrender.com'); 
-//     const data = await res.json();
-//     console.log(data)
-//   } catch (err) {
-    
-//   }
-// }, 300000);
