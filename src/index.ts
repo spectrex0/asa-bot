@@ -91,7 +91,7 @@ client.on('ready', () => {
 });
 
 client.login(Tx).catch((err: any) => {
-    console.error(`❌ Error in with token: ${Tx.slice(0, 10)}...`);
+    console.error(`❌ Error logging in with token: ${err.message}`);
 });
 
 
