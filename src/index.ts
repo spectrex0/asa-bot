@@ -20,106 +20,80 @@ import onDel from "./events/messageDelete.ts";
 import { systemPrompt } from "./prompt.ts";
 import ask from "./ask.ts";
 dotenv.config();
-import Discord from "discord.js-selfbot-v13";
-import "dotenv/config";
 
-interface BotConfig {
-  TOKEN: string;
-  SERVER_ID: string;
-  CHANNEL_ID: string;
-  CHECK_INTERVAL: number;
-  MEMBER_LIMIT: number;
+
+import Discord from 'discord.js-selfbot-v13';
+
+interface ServerConfig {
+    SERVER_ID: string;
+    CHANNEL_ID: string;
 }
 
-function getConfig(prefix: string): BotConfig | null {
-  const TOKEN = process.env[`${prefix}_TOKEN`];
-  const SERVER_ID = process.env[`${prefix}_SERVER_ID`];
-  const CHANNEL_ID = process.env[`${prefix}_CHANNEL_ID`];
+const TOKEN: string = process.env.TOKEN!;
+const MEMBER_LIMIT: number = process.env.MEMBER_LIMIT ? parseInt(process.env.MEMBER_LIMIT, 10) : 10;
+const CHECK_INTERVAL: number = process.env.CHECK_INTERVAL ? parseInt(process.env.CHECK_INTERVAL, 10) : 60000;
 
-  if (!TOKEN || !SERVER_ID || !CHANNEL_ID) {
-    console.warn(`⚠️ Configuración incompleta para ${prefix}, omitiendo...`);
-    return null;
-  }
-
-  const CHECK_INTERVAL = parseInt(process.env[`${prefix}_CHECK_INTERVAL`] || "180000");
-  const MEMBER_LIMIT = parseInt(process.env[`${prefix}_MEMBER_LIMIT`] || "10");
-
-  return {
-    TOKEN,
-    SERVER_ID,
-    CHANNEL_ID,
-    CHECK_INTERVAL: isNaN(CHECK_INTERVAL) ? 180000 : CHECK_INTERVAL,
-    MEMBER_LIMIT: isNaN(MEMBER_LIMIT) ? 10 : MEMBER_LIMIT,
-  };
+let serversEnv = process.env.SERVERS || '[]';
+if (serversEnv.startsWith("'") && serversEnv.endsWith("'")) {
+    serversEnv = serversEnv.slice(1, -1);
 }
+const SERVERS: ServerConfig[] = JSON.parse(serversEnv);
 
-async function logRecentMembers(client: Discord.Client, config: BotConfig): Promise<void> {
-  try {
-    const server = client.guilds.cache.get(config.SERVER_ID);
-    if (!server) {
-      console.error(`[${client.user?.tag || "Unknown"}] ❌ Server not found: ${config.SERVER_ID}`);
-      return;
+const client = new Discord.Client();
+const previousJoins: Map<string, string[]> = new Map();
+
+async function checkServer(serverConfig: ServerConfig): Promise<void> {
+    try {
+        const server = client.guilds.cache.get(serverConfig.SERVER_ID);
+        const logChannel = client.channels.cache.get(serverConfig.CHANNEL_ID) as Discord.TextChannel | undefined;
+
+        if (!server || !logChannel) {
+            console.error(`[${client.user?.tag}] Server or channel not found for ID ${serverConfig.SERVER_ID}.`);
+            return;
+        }
+
+        const members = await server.members.fetch();
+        const sortedMembers = members
+            .filter(m => m.joinedTimestamp !== null && m.joinedTimestamp !== undefined)
+            .sort((a, b) => (b.joinedTimestamp || 0) - (a.joinedTimestamp || 0));
+
+        const limit = MEMBER_LIMIT > 0 ? MEMBER_LIMIT : 10;
+        const recentMembers = sortedMembers.first(limit);
+        const currentJoinIds = recentMembers.map(m => m.id);
+        const previousJoinIds = previousJoins.get(server.id) || [];
+
+        if (JSON.stringify(currentJoinIds) === JSON.stringify(previousJoinIds)) return;
+
+        previousJoins.set(server.id, currentJoinIds);
+
+        const memberList = recentMembers.map(member => {
+            return `**${member.user.tag}**\n` +
+                `> 👤 Account created: ${new Date(member.user.createdTimestamp).toLocaleString()}\n` +
+                `> 📥 Joined: ${new Date(member.joinedTimestamp!).toLocaleString()}`;
+        }).join("\n\n");
+
+        await logChannel.send({
+            content: `📋 **Last ${limit} members who joined ${server.name}:**\n\n${memberList}\n\n----------------------------------------------------`
+        });
+
+    } catch (error) {
+        console.error(`[${client.user?.tag}] Error in checkServer for ${serverConfig.SERVER_ID}:`, error);
     }
-
-    const logChannel = client.channels.cache.get(config.CHANNEL_ID);
-    if (!logChannel || !("send" in logChannel)) {
-      console.error(`[${client.user?.tag || "Unknown"}] ❌ Channel not found or not text-based: ${config.CHANNEL_ID}`);
-      return;
-    }
-
-    const members = await server.members.fetch();
-    const recentMembers = members
-      .filter((m: Discord.GuildMember) => m.joinedTimestamp !== null)
-      .sort((a: Discord.GuildMember, b: Discord.GuildMember) => (b.joinedTimestamp || 0) - (a.joinedTimestamp || 0))
-      .first(config.MEMBER_LIMIT);
-
-    if (!recentMembers || recentMembers.length === 0) {
-      console.log(`[${client.user?.tag}] 🟡 No recent members found.`);
-      return;
-    }
-
-    const list = recentMembers
-      .map((member: Discord.GuildMember) => {
-        return (
-          `**${member.user.tag}**\n` +
-          `> 👤 Created: ${new Date(member.user.createdTimestamp).toLocaleString()}\n` +
-          `> 📥 Joined: ${new Date(member.joinedTimestamp!).toLocaleString()}`
-        );
-      })
-      .join("\n\n");
-
-    await (logChannel as Discord.TextBasedChannel).send({
-      content: `📋 **Last ${config.MEMBER_LIMIT} members to join ${server.name}**:\n\n${list}\n\n━━━━━━━━━━━━━━━━━━━━`
-    });
-
-    console.log(`✅ Sent recent member list for ${server.name}`);
-  } catch (error) {
-    console.error(`[${client.user?.tag || "Unknown"}] ❌ Error fetching members:`, error);
-  }
 }
 
-export function startClient(config: BotConfig): void {
-  const client = new Discord.Client();
+client.on('ready', () => {
+    console.log(`✅ Connected as ${client.user?.tag}`);
 
-  client.on("ready", () => {
-    console.log(`✅ [${client.user?.tag}] Logged in successfully!`);
-    logRecentMembers(client, config);
-    setInterval(() => logRecentMembers(client, config), config.CHECK_INTERVAL);
-  });
+    SERVERS.forEach(srv => checkServer(srv));
+    setInterval(() => {
+        SERVERS.forEach(srv => checkServer(srv));
+    }, CHECK_INTERVAL);
+});
 
-  client.login(config.TOKEN).catch((err: Error) => {
-    console.error(`❌ Login failed for bot with token: ${config.TOKEN.slice(0, 12)}...`, err.message);
-  });
-}
+client.login(TOKEN).catch(err => {
+    console.error(`❌ Error logging in with token: ${TOKEN.slice(0, 10)}...`);
+});
 
-// === Start all bots ===
-const BOT_COUNT = 3;
-
-for (let i = 1; i <= BOT_COUNT; i++) {
-  const prefix = `BOT${i}`;
-  const config = getConfig(prefix);
-  if (config) startClient(config);
-}
 
 export const asa = new Client({
   intents: [
@@ -293,7 +267,7 @@ async function jailUser(guild: Guild, userId: string): Promise<void> {
 
 const server = new Elysia({ adapter: node() }).listen(3000);
 server.get("/api", () => ({
-  message: "👨‍💻",
+  message: "",
 }));
 server.use(cors());
 log("[BACKEND] port 3000");
@@ -302,7 +276,6 @@ async function startBot() {
   aiBrain();
   onDel()
   Commands();
-  startClient
   ask()
   sendRequest() 
   asa.once("ready", () => {
@@ -324,7 +297,7 @@ setInterval(async () => {
   try {
     const res = await fetch('https://autobumpr.onrender.com/bump'); 
     const data = await res.json();
-    console.log(data)
+    
   } catch (err) {
     
   }
