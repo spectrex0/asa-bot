@@ -71,14 +71,14 @@ client.on("ready", () => {
 
 client.login(Tx).catch(err => console.error("[Login Error]", err));
 
-// const asa = new Client({
-//   intents: [
-//     GatewayIntentBits.Guilds,
-//     GatewayIntentBits.GuildMessages,
-//     GatewayIntentBits.MessageContent,
-//     GatewayIntentBits.GuildMembers,
-//   ]
-// });
+const asa = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers,
+  ]
+});
 
 // const SCAM_RULES_PATH = join(__dirname, "scamPatterns.json");
 // const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`;
@@ -172,16 +172,16 @@ async function startBot() {
   // Commands();
   // ask();
   sendRequest();
-  // asa.once("ready", () => {
-  //   asa.user?.setStatus("online");
-  //   asa.user?.setActivity({ name: "with TypeScript", type: ActivityType.Playing });
-  //   log("[ONLINE] Bot ready", asa.user?.username);
-  // });
-  // await asa.login(process.env.TOKEN);
+  asa.once("ready", () => {
+    asa.user?.setStatus("online");
+    asa.user?.setActivity({ name: "with TypeScript", type: ActivityType.Playing });
+    log("[ONLINE] Bot ready", asa.user?.username);
+  });
+  await asa.login(process.env.TOKEN);
 }
 
 startBot();
-// export default asa;
+  export default asa;
 
 // OPTIONAL PING TO KEEP APP ACTIVE (IF NECESSARY)
 setInterval(async () => {
